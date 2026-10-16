@@ -26,7 +26,7 @@ command -v osc >/dev/null || { echo "osc not installed / not in PATH"; exit 1; }
 
 # Run osc once un-piped so a first-run login prompt is visible (later calls
 # pipe osc output into grep, which would swallow the prompt).
-osc whoami || { echo "osc login failed"; exit 1; }
+osc whois || { echo "osc login failed"; exit 1; }
 
 echo "==> Checking $PROJ has a $REPO repository"
 if osc meta prj "$PROJ" | grep -q "<repository name=\"$REPO\""; then
