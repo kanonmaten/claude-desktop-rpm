@@ -193,6 +193,7 @@ chmod 0755 "$APP/chrome-sandbox"
 %dir %{_datadir}/gnome-shell
 %dir %{_datadir}/gnome-shell/search-providers
 %{_datadir}/gnome-shell/search-providers/com.anthropic.Claude.search-provider.ini
+%dir %{_prefix}/lib/modules-load.d
 %{_prefix}/lib/modules-load.d/claude-desktop.conf
 %dir %{_datadir}/dbus-1
 %dir %{_datadir}/dbus-1/services
