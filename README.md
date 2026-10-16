@@ -22,11 +22,11 @@ sudo zypper install claude-desktop
 
 x86_64 only. Updates arrive with `sudo zypper dup`.
 
-Cowork additionally needs hardware virtualization, your user in the `kvm`
-group (`sudo usermod -aG kvm $USER`, then log out/in) and the
-`vhost_vsock` module (`echo vhost_vsock | sudo tee /etc/modules-load.d/vhost_vsock.conf`).
-The QEMU/OVMF/virtiofsd packages come in as Recommends; skip them with
-`zypper in --no-recommends claude-desktop` if you don't use Cowork.
+Everything (Chat, Cowork, Claude Code) works out of the box: the Cowork VM
+stack (QEMU, OVMF, virtiofsd) and Claude Code's helpers come in as
+Recommends, the package loads `vhost_vsock`, and Tumbleweed already grants
+every user access to `/dev/kvm` and `/dev/vhost-vsock`, so no `kvm` group
+is needed. Only requirement: hardware virtualization enabled in firmware.
 
 ## How it works
 

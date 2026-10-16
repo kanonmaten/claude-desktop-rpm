@@ -98,8 +98,9 @@ Claude desktop application for Linux (beta). Provides Chat, Cowork and
 Claude Code in a native app. Upstream only ships .deb builds; this
 package repackages the official amd64 .deb payload as an RPM.
 
-Cowork additionally needs a KVM-capable machine, QEMU, OVMF and
-virtiofsd, plus the user in the KVM group.
+Cowork runs in a QEMU virtual machine and needs hardware
+virtualization; QEMU, OVMF and virtiofsd are pulled in as
+recommended packages and the vhost_vsock module is loaded at boot.
 
 %prep
 # Integrity check: the .deb is fetched over TLS by the download_url service;
@@ -154,6 +155,11 @@ if [ -x "$APP/resources/bin/ccd" ]; then
   ln -s ../lib/claude-desktop/resources/bin/ccd %{buildroot}%{_bindir}/ccd
   echo '%{_bindir}/ccd' >> extra.files
 fi
+#  - Cowork's VM needs vhost_vsock. Tumbleweed's udev already makes
+#    /dev/kvm and /dev/vhost-vsock world-accessible (0666), so no kvm group
+#    is needed; just make sure the module is loaded at boot.
+install -dm 0755 %{buildroot}%{_prefix}/lib/modules-load.d
+echo vhost_vsock > %{buildroot}%{_prefix}/lib/modules-load.d/claude-desktop.conf
 # Skipped on purpose: the AppArmor profile (Ubuntu userns restriction, not
 # needed here) and the apt repo/keyring registration (OBS repo replaces it).
 
@@ -170,6 +176,10 @@ chmod 0755 "$APP/chrome-sandbox"
 # No desktop/icon cache scriptlets: Tumbleweed runs update-desktop-database,
 # gtk-update-icon-cache and update-mime-database from file triggers.
 
+%post
+# Load vhost_vsock now too, so Cowork works without a reboot.
+/usr/sbin/modprobe -q vhost_vsock 2>/dev/null || :
+
 %files -f extra.files
 %license payload/usr/share/doc/claude-desktop/copyright
 %{_prefix}/lib/claude-desktop
@@ -183,6 +193,7 @@ chmod 0755 "$APP/chrome-sandbox"
 %dir %{_datadir}/gnome-shell
 %dir %{_datadir}/gnome-shell/search-providers
 %{_datadir}/gnome-shell/search-providers/com.anthropic.Claude.search-provider.ini
+%{_prefix}/lib/modules-load.d/claude-desktop.conf
 %dir %{_datadir}/dbus-1
 %dir %{_datadir}/dbus-1/services
 %{_datadir}/dbus-1/services/com.anthropic.Claude.SearchProvider.service
