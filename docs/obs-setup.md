@@ -1,27 +1,28 @@
 # OBS setup (one-time)
 
-Wires `home:kanonmaten/claude-desktop` on build.opensuse.org to this repo.
-Done once; after that a push to `main` rebuilds and PRs get test-built.
+These steps connect `home:kanonmaten/claude-desktop` on build.opensuse.org to
+this repo. You only do them once. After that, a push to `main` triggers a
+rebuild and every PR gets a test build.
 
-## Model
+## How the pieces fit
 
-- **Package source is this git repo**, via `<scmsync>` in the package meta
-  (`obs-scm-bridge`) — no `osc ci`. The `<scmsync>` URL carries
-  `?subdir=packaging#main`, so only `packaging/` is packaged; a push that
-  doesn't touch `packaging/` regenerates an identical tree and correctly
-  does not rebuild.
-- **The 166 MB `.deb` is never in git.** `packaging/_service` runs
-  `download_url` at build time; `%prep` verifies its SHA256 against the
+- This git repo is the package source. The package meta has a `<scmsync>`
+  entry (`obs-scm-bridge`), so you never run `osc ci`. The `<scmsync>` URL
+  ends in `?subdir=packaging#main`, which means only `packaging/` is
+  packaged. A push that doesn't touch `packaging/` produces the same tree, so
+  OBS correctly skips the rebuild.
+- The 166 MB `.deb` is not stored in git. `packaging/_service` runs
+  `download_url` at build time, and `%prep` checks its SHA256 against the
   value in Anthropic's apt `Packages` index.
-- **`.obs/workflows.yml`** (repo root) drives **PR builds**: each PR is
-  branched into `home:kanonmaten:ci:kanonmaten:claude-desktop-rpm:PR-<n>`,
-  built with publishing disabled, and the result is posted back to the PR
-  as status checks. The branch project auto-deletes when the PR closes.
-- **`.github/workflows/upstream-bump.yml`** opens a bump PR when Anthropic
-  ships a newer build. Needs no OBS credentials.
+- `.obs/workflows.yml` in the repo root handles PR builds. OBS branches each
+  PR into `home:kanonmaten:ci:kanonmaten:claude-desktop-rpm:PR-<n>`, builds it
+  with publishing turned off, and posts the result back to the PR as status
+  checks. The branch project is deleted automatically when the PR closes.
+- `.github/workflows/upstream-bump.yml` opens a bump PR when Anthropic ships a
+  newer build. It needs no OBS credentials.
 
 ```
-Anthropic apt index ─(every 2 h)→ bump PR ─→ OBS PR build (status checks)
+Anthropic apt index ─(hourly)→ bump PR ─→ OBS PR build (status checks)
                                       │
                                     merge ─→ push webhook ─→ rebuild ─→
                                       download.opensuse.org/repositories/home:kanonmaten/
@@ -29,27 +30,29 @@ Anthropic apt index ─(every 2 h)→ bump PR ─→ OBS PR build (status checks
 
 ## Steps
 
-### 1. OBS side (scriptable)
+### 1. OBS side (scripted)
 
 ```
 scripts/obs-bootstrap.sh
 ```
 
-Idempotent. Creates `home:kanonmaten:ci` (the PR branch target) and sets
+You can run it as many times as you like. It creates `home:kanonmaten:ci`
+(where PR builds are branched) and sets
 
 ```xml
 <scmsync>https://github.com/kanonmaten/claude-desktop-rpm?subdir=packaging#main</scmsync>
 ```
 
-on `home:kanonmaten/claude-desktop`. It also creates the `runservice`
-token (step 3a). By hand: `osc meta pkg home:kanonmaten claude-desktop -e`.
+on `home:kanonmaten/claude-desktop`. It also creates the `runservice` token
+used in step 3a. To edit the package meta by hand instead:
+`osc meta pkg home:kanonmaten claude-desktop -e`.
 
 ### 2. GitHub PAT for OBS
 
-Fine-grained token on `kanonmaten/claude-desktop-rpm`:
+Create a fine-grained token for `kanonmaten/claude-desktop-rpm` with:
 
-- **Contents:** read-only
-- **Commit statuses:** read/write  (so OBS can report PR build results)
+- Contents: read-only
+- Commit statuses: read and write, so OBS can report PR build results
 
 ### 3. Two OBS tokens
 
@@ -61,22 +64,24 @@ osc token --create --operation runservice home:kanonmaten claude-desktop
 osc token --create --operation workflow --scm-token <GITHUB_PAT>
 ```
 
-Each prints an **id** and a **secret string**. Two are needed because the
-two `/trigger/*` endpoints do different things: `/trigger/webhook`
-(runservice) re-pulls the scmsync source and rebuilds; `/trigger/workflow`
-only executes `.obs/workflows.yml` steps, which are PR-only.
+Each command prints an id and a secret string. You need two tokens because
+the two `/trigger/*` endpoints do different jobs. `/trigger/webhook`
+(runservice) re-pulls the scmsync source and rebuilds. `/trigger/workflow`
+only runs the steps in `.obs/workflows.yml`, and those only cover PRs.
 
 ### 4. Two GitHub webhooks
 
-Repo **Settings → Webhooks → Add webhook**, twice. SSL verification on,
-the token **string** in *Secret*, and **Content type: `application/json`
-— not the GitHub default.** GitHub's "Add webhook" form defaults to
-`application/x-www-form-urlencoded`; it's easy to leave it there since
-everything else about the form looks right. `/trigger/workflow` rejects
-a form-encoded body outright (`403`, `X-Opensuse-Errorcode: invalid_token`
-— indistinguishable at a glance from a wrong secret). `/trigger/webhook`
-happens to tolerate form encoding, so if only the PR builds are broken,
-check this first before touching the secret.
+Go to the repo's Settings → Webhooks → Add webhook, and do it twice. Keep SSL
+verification on, put the token string in Secret, and set Content type to
+`application/json`.
+
+The content type is the step people get wrong. GitHub's "Add webhook" form
+defaults to `application/x-www-form-urlencoded`, and the rest of the form
+looks fine, so it's easy to leave as is. `/trigger/workflow` rejects a
+form-encoded body with a `403` and `X-Opensuse-Errorcode: invalid_token`,
+which looks exactly like a wrong secret. `/trigger/webhook` happens to accept
+form encoding. So if only the PR builds are broken, check the content type
+before you touch the secret.
 
 | Payload URL | Events |
 |---|---|
@@ -85,25 +90,27 @@ check this first before touching the secret.
 
 ### 5. GitHub repo setting
 
-**Settings → Actions → General → Workflow permissions:** enable *Allow
-GitHub Actions to create and approve pull requests* (for `upstream-bump`).
+In Settings → Actions → General → Workflow permissions, turn on "Allow
+GitHub Actions to create and approve pull requests". `upstream-bump` needs
+it.
 
-## Verify
+## Check that it works
 
-- Push a commit that changes `packaging/` → `_scmsync.obsinfo` advances and
-  a build starts:
+- Push a commit that changes `packaging/`. `_scmsync.obsinfo` should move
+  forward and a build should start:
   `osc api /source/home:kanonmaten/claude-desktop/_scmsync.obsinfo`
-- Open a throwaway PR → an "OBS" status check appears and goes green.
-- Force a sync by hand if ever needed:
+- Open a throwaway PR. An "OBS" status check should appear and turn green.
+- To force a sync by hand at any time:
   `osc service remoterun home:kanonmaten claude-desktop`
 
 ## Troubleshooting
 
-- **PR webhook ping returns `403`, body
-  `<status code="invalid_token"><summary>No valid token found</summary>`.**
-  Reads like a bad secret but usually isn't — first confirm the token is
-  actually fine by replaying a self-signed request straight at OBS,
-  bypassing GitHub:
+- The PR webhook ping returns `403` with the body
+  `<status code="invalid_token"><summary>No valid token found</summary>`.
+
+  This reads like a bad secret, but usually isn't one. First check that the
+  token itself is fine by sending a self-signed request straight to OBS,
+  without going through GitHub:
   ```sh
   secret=<WORKFLOW_TOKEN_STRING>
   payload='{"zen":"test","repository":{"full_name":"kanonmaten/claude-desktop-rpm"}}'
@@ -112,10 +119,11 @@ GitHub Actions to create and approve pull requests* (for `upstream-bump`).
     -H "Content-Type: application/json" -H "X-GitHub-Event: ping" \
     -H "X-Hub-Signature-256: sha256=$sig" --data "$payload"
   ```
-  A `200` here proves the token/project wiring is fine and the problem is
-  purely how GitHub is signing its own deliveries — almost always the
-  webhook's **Content type** left on `form` instead of `application/json`
-  (see step 4). Only chase the secret itself once this replay also fails.
+  If this returns `200`, the token and project are wired up correctly, and
+  the problem is how GitHub signs its own deliveries. That is almost always
+  the webhook's Content type still set to `form` instead of
+  `application/json` (see step 4). Only look at the secret itself if this
+  request fails too.
 
 ## Install on a desktop
 
