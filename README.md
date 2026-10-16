@@ -1,5 +1,7 @@
 # claude-desktop for openSUSE Tumbleweed
 
+[![build result](https://build.opensuse.org/projects/home:kanonmaten/packages/claude-desktop/badge.svg?type=default)](https://build.opensuse.org/package/show/home:kanonmaten/claude-desktop)
+
 Repackages Anthropic's official [Claude Desktop](https://claude.ai) Linux
 beta (shipped only as `.deb`) into a native **RPM for openSUSE Tumbleweed**,
 built and GPG-signed by the [Open Build Service](https://build.opensuse.org)
