@@ -1,0 +1,77 @@
+name: hierynomus packaging changes
+
+# This repo is a Tumbleweed fork of hierynomus/claude-desktop-rpm. New Claude
+# Desktop versions come in on their own (upstream-bump.yml reads Anthropic's
+# apt index directly), so his routine "update to upstream release" commits
+# are ignored here.
+#
+# What this catches: his *packaging* changes (new deps, %files fixes, sandbox
+# changes...). Those target Leap 16 and can break Tumbleweed if merged blindly,
+# so instead of a PR this opens an issue listing the commits with a compare
+# link. Review, port what makes sense, close the issue. The next issue only
+# appears once he pushes something newer than the head recorded in the last
+# one.
+
+on:
+  schedule:
+    - cron: "41 7 * * *"   # daily, 07:41 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compare with hierynomus/main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM: hierynomus/claude-desktop-rpm
+        run: |
+          set -euo pipefail
+          git remote add upstream "https://github.com/$UPSTREAM.git"
+          git fetch --quiet upstream main
+          head=$(git rev-parse upstream/main)
+
+          # Where did we last look? The newest upstream-sync issue records it.
+          gh label create upstream-sync --color c5def5 \
+            --description "Packaging changes in hierynomus/claude-desktop-rpm" 2>/dev/null || true
+          last=$(gh issue list --label upstream-sync --state all --limit 1 \
+                   --json body --jq '.[0].body // ""' \
+                 | sed -n 's/^Upstream head: `\([0-9a-f]\{40\}\)`.*/\1/p')
+          if [ -z "$last" ] || ! git cat-file -e "$last^{commit}" 2>/dev/null; then
+            last=$(git merge-base HEAD upstream/main)
+          fi
+          [ "$last" = "$head" ] && { echo "nothing new upstream"; exit 0; }
+
+          # Everything except his automated version bumps.
+          commits=$(git log --reverse --no-merges --format='%H%x09%s' "$last..$head" \
+                    | grep -v -E $'\tclaude-desktop [0-9.]+: update to upstream release' || true)
+          if [ -z "$commits" ]; then
+            echo "only version bumps upstream since ${last:0:12}"
+            exit 0
+          fi
+
+          {
+            echo "hierynomus pushed packaging changes since \`${last:0:12}\`:"
+            echo
+            while IFS=$'\t' read -r sha subject; do
+              echo "- [\`${sha:0:7}\`](https://github.com/$UPSTREAM/commit/$sha) $subject"
+            done <<<"$commits"
+            echo
+            echo "Compare: https://github.com/$UPSTREAM/compare/$last...$head"
+            echo
+            echo "Port what applies to Tumbleweed (watch dependency names), then close this issue."
+            echo
+            echo "Upstream head: \`$head\`"
+          } > body.md
+
+          gh issue create --label upstream-sync \
+            --title "hierynomus packaging changes up to ${head:0:7}" \
+            --body-file body.md

@@ -1,6 +1,6 @@
 # OBS setup (one-time)
 
-Wires `home:hierynomus/claude-desktop` on build.opensuse.org to this repo.
+Wires `home:kanonmaten/claude-desktop` on build.opensuse.org to this repo.
 Done once; after that a push to `main` rebuilds and PRs get test-built.
 
 ## Model
@@ -14,7 +14,7 @@ Done once; after that a push to `main` rebuilds and PRs get test-built.
   `download_url` at build time; `%prep` verifies its SHA256 against the
   value in Anthropic's apt `Packages` index.
 - **`.obs/workflows.yml`** (repo root) drives **PR builds**: each PR is
-  branched into `home:hierynomus:ci:hierynomus:claude-desktop-rpm:PR-<n>`,
+  branched into `home:kanonmaten:ci:kanonmaten:claude-desktop-rpm:PR-<n>`,
   built with publishing disabled, and the result is posted back to the PR
   as status checks. The branch project auto-deletes when the PR closes.
 - **`.github/workflows/upstream-bump.yml`** opens a bump PR when Anthropic
@@ -24,7 +24,7 @@ Done once; after that a push to `main` rebuilds and PRs get test-built.
 Anthropic apt index ─(daily cron)→ bump PR ─→ OBS PR build (status checks)
                                       │
                                     merge ─→ push webhook ─→ rebuild ─→
-                                      download.opensuse.org/repositories/home:hierynomus/
+                                      download.opensuse.org/repositories/home:kanonmaten/
 ```
 
 ## Steps
@@ -35,18 +35,18 @@ Anthropic apt index ─(daily cron)→ bump PR ─→ OBS PR build (status check
 scripts/obs-bootstrap.sh
 ```
 
-Idempotent. Creates `home:hierynomus:ci` (the PR branch target) and sets
+Idempotent. Creates `home:kanonmaten:ci` (the PR branch target) and sets
 
 ```xml
-<scmsync>https://github.com/hierynomus/claude-desktop-rpm?subdir=packaging#main</scmsync>
+<scmsync>https://github.com/kanonmaten/claude-desktop-rpm?subdir=packaging#main</scmsync>
 ```
 
-on `home:hierynomus/claude-desktop`. It also creates the `runservice`
-token (step 3a). By hand: `osc meta pkg home:hierynomus claude-desktop -e`.
+on `home:kanonmaten/claude-desktop`. It also creates the `runservice`
+token (step 3a). By hand: `osc meta pkg home:kanonmaten claude-desktop -e`.
 
 ### 2. GitHub PAT for OBS
 
-Fine-grained token on `hierynomus/claude-desktop-rpm`:
+Fine-grained token on `kanonmaten/claude-desktop-rpm`:
 
 - **Contents:** read-only
 - **Commit statuses:** read/write  (so OBS can report PR build results)
@@ -55,7 +55,7 @@ Fine-grained token on `hierynomus/claude-desktop-rpm`:
 
 ```
 # a) push to main -> re-pull git + rebuild
-osc token --create --operation runservice home:hierynomus claude-desktop
+osc token --create --operation runservice home:kanonmaten claude-desktop
 
 # b) PR events -> run .obs/workflows.yml  (feed it the PAT from step 2)
 osc token --create --operation workflow --scm-token <GITHUB_PAT>
@@ -92,10 +92,10 @@ GitHub Actions to create and approve pull requests* (for `upstream-bump`).
 
 - Push a commit that changes `packaging/` → `_scmsync.obsinfo` advances and
   a build starts:
-  `osc api /source/home:hierynomus/claude-desktop/_scmsync.obsinfo`
+  `osc api /source/home:kanonmaten/claude-desktop/_scmsync.obsinfo`
 - Open a throwaway PR → an "OBS" status check appears and goes green.
 - Force a sync by hand if ever needed:
-  `osc service remoterun home:hierynomus claude-desktop`
+  `osc service remoterun home:kanonmaten claude-desktop`
 
 ## Troubleshooting
 
@@ -106,7 +106,7 @@ GitHub Actions to create and approve pull requests* (for `upstream-bump`).
   bypassing GitHub:
   ```sh
   secret=<WORKFLOW_TOKEN_STRING>
-  payload='{"zen":"test","repository":{"full_name":"hierynomus/claude-desktop-rpm"}}'
+  payload='{"zen":"test","repository":{"full_name":"kanonmaten/claude-desktop-rpm"}}'
   sig=$(printf '%s' "$payload" | openssl dgst -sha256 -hmac "$secret" | sed 's/^.* //')
   curl -i -X POST "https://build.opensuse.org/trigger/workflow?id=<WORKFLOW_TOKEN_ID>" \
     -H "Content-Type: application/json" -H "X-GitHub-Event: ping" \
@@ -120,7 +120,7 @@ GitHub Actions to create and approve pull requests* (for `upstream-bump`).
 ## Install on a desktop
 
 ```
-sudo zypper ar https://download.opensuse.org/repositories/home:hierynomus/openSUSE_Leap_16.0/home:hierynomus.repo
+sudo zypper ar https://download.opensuse.org/repositories/home:kanonmaten/openSUSE_Tumbleweed/home:kanonmaten.repo
 sudo zypper refresh
 sudo zypper install claude-desktop
 ```

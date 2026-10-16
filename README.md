@@ -1,21 +1,32 @@
-# claude-desktop for openSUSE
+# claude-desktop for openSUSE Tumbleweed
 
 Repackages Anthropic's official [Claude Desktop](https://claude.ai) Linux
-beta (shipped only as an `amd64` `.deb`) into a native **RPM for openSUSE**,
+beta (shipped only as `.deb`) into a native **RPM for openSUSE Tumbleweed**,
 built and GPG-signed by the [Open Build Service](https://build.opensuse.org)
-project [`home:hierynomus`](https://build.opensuse.org/package/show/home:hierynomus/claude-desktop).
+project [`home:kanonmaten`](https://build.opensuse.org/package/show/home:kanonmaten/claude-desktop).
+
+Fork of [hierynomus/claude-desktop-rpm](https://github.com/hierynomus/claude-desktop-rpm)
+(which targets Leap 16). Differences: Tumbleweed target, deps re-mapped for
+Tumbleweed and the current upstream `.deb` (PipeWire, portal backend, rich
+deps so KDE doesn't pull GNOME), Cowork / Claude Code helpers as
+Recommends, MIME types + search provider installed by rpm, and a version
+check every 2 hours instead of daily.
 
 ## Install
 
 ```sh
-sudo zypper ar https://download.opensuse.org/repositories/home:hierynomus/openSUSE_Leap_16.0/home:hierynomus.repo
+sudo zypper ar -f https://download.opensuse.org/repositories/home:kanonmaten/openSUSE_Tumbleweed/home:kanonmaten.repo
 sudo zypper refresh
 sudo zypper install claude-desktop
 ```
 
-x86_64 only (upstream ships no other arch). Cowork additionally needs a
-KVM-capable host with `qemu` + `ovmf` + `virtiofsd` and your user in the
-`kvm` group.
+x86_64 only. Updates arrive with `sudo zypper dup`.
+
+Cowork additionally needs hardware virtualization, your user in the `kvm`
+group (`sudo usermod -aG kvm $USER`, then log out/in) and the
+`vhost_vsock` module (`echo vhost_vsock | sudo tee /etc/modules-load.d/vhost_vsock.conf`).
+The QEMU/OVMF/virtiofsd packages come in as Recommends; skip them with
+`zypper in --no-recommends claude-desktop` if you don't use Cowork.
 
 ## How it works
 
@@ -31,7 +42,8 @@ value in Anthropic's apt index.
 | `packaging/claude-desktop-rpmlintrc` | rpmlint filters for upstream-inherent / deliberate findings |
 | `packaging/_service` | `download_url` for the upstream `.deb` |
 | `.obs/workflows.yml` | OBS SCM/CI — build each PR in a scratch project, report status back |
-| `.github/workflows/upstream-bump.yml` | daily — open a PR when Anthropic publishes a newer build |
+| `.github/workflows/upstream-bump.yml` | every 2 h — open a PR when Anthropic publishes a newer build |
+| `.github/workflows/upstream-sync.yml` | daily — open an issue when hierynomus changes the packaging |
 | `scripts/bump-version.sh` | rewrite `packaging/` from the apt index (no `.deb` download) |
 | `scripts/local-build.sh` | fetch the `.deb` + `rpmbuild -bb` locally, to test before OBS |
 | `scripts/obs-bootstrap.sh` | one-time OBS setup (`:ci` project, `<scmsync>`, runservice token) |
@@ -42,7 +54,7 @@ value in Anthropic's apt index.
 1. `upstream-bump.yml` (or `scripts/bump-version.sh` by hand) opens a PR
    bumping `Version` + `%global deb_sha256` + the `_service` URL.
 2. OBS test-builds the PR; the status check lands on it.
-3. Merge → OBS re-syncs and rebuilds `home:hierynomus/claude-desktop`.
+3. Auto-merge on green → OBS re-syncs and rebuilds `home:kanonmaten/claude-desktop`.
 
 ## Local build
 
@@ -50,7 +62,7 @@ value in Anthropic's apt index.
 scripts/local-build.sh        # -> ./dist/claude-desktop-*.x86_64.rpm
 ```
 
-Needs `rpm-build`. Same `%prep` checksum gate as OBS.
+Needs `rpm-build` and `fdupes`. Same `%prep` checksum gate as OBS.
 
 ## One-time OBS wiring
 
@@ -62,7 +74,7 @@ create a GitHub PAT and the `workflow` token, then add two GitHub webhooks
 
 `chrome-sandbox` is shipped **non-SUID** (upstream's `.deb` sets it `4755`).
 Chromium prefers the unprivileged **user-namespace sandbox** and only uses
-the SUID helper as a fallback; openSUSE enables unprivileged user namespaces
+the SUID helper as a fallback; Tumbleweed enables unprivileged user namespaces
 by default (podman-rootless, flatpak rely on it), so the sandbox is fully
 active. This is *not* `--no-sandbox`, and it's verified working on openSUSE.
 

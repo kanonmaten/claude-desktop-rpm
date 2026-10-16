@@ -6,9 +6,10 @@
 # app uses the user-namespace sandbox, so no permissions check fires at all.
 
 # --- upstream prebuilt binaries we cannot rebuild ---------------------------
-# github-mcp-server and cowork-linux-helper are statically linked Go binaries
+# github-mcp-server, cowork-linux-helper and claude-ssh-askpass are statically
+# linked Go binaries
 # shipped by upstream; static linking and non-PIE are upstream build choices.
-addFilter(r"statically-linked-binary .*/(github-mcp-server|cowork-linux-helper)")
+addFilter(r"statically-linked-binary .*/(github-mcp-server|cowork-linux-helper|claude-ssh-askpass)")
 addFilter(r"position-independent-executable-suggested .*/(github-mcp-server|cowork-linux-helper)")
 # Electron's chrome-sandbox and node-pty's pty.node: upstream SUID/helper code.
 addFilter(r"missing-call-to-setgroups-before-setuid .*/(chrome-sandbox|pty\.node)")
@@ -22,4 +23,4 @@ addFilter(r"no-%check-section")
 # The explicit lib Requires are load-bearing: 6 of the 8 are not NEEDED of
 # any shipped ELF, so rpm's auto-dep scan misses them and a minimal install
 # is broken without them. Kept on purpose (see the Requires block in the spec).
-addFilter(r"explicit-lib-dependency (libgtk-3-0|libnotify4|libsecret-1-0|libuuid1|libXtst6|libdrm2|libgbm1|libxcb-dri3-0)")
+addFilter(r"explicit-lib-dependency (libatspi0|libgtk-3-0|libnotify4|libpipewire-0_3-0|libsecret-1-0|libuuid1|libXtst6|libdrm2|libgbm1|libxcb-dri3-0)")

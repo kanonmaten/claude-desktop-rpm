@@ -12,8 +12,8 @@
 pull_request:
   steps:
     - branch_package:
-        source_project: home:hierynomus
+        source_project: home:kanonmaten
         source_package: claude-desktop
-        target_project: home:hierynomus:ci
+        target_project: home:kanonmaten:ci
   filters:
     event: pull_request

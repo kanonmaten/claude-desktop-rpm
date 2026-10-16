@@ -9,6 +9,8 @@
 # so this never downloads the 166 MB .deb. OBS fetches it at build time and
 # the spec's %prep verifies it against deb_sha256.
 #
+# Changelog author: $PACKAGER (default "kanonmaten <86723077+kanonmaten@users.noreply.github.com>").
+#
 # Usage:
 #   scripts/bump-version.sh [VERSION]     # default: newest in the index
 #   scripts/bump-version.sh --commit ...  # also `git add` + `git commit`
@@ -83,7 +85,7 @@ awk -v new="$new" -v sha="$sha" '
   { print }
 ' "$SPEC" > "$tmp"
 
-entry="* $(LC_ALL=C date '+%a %b %d %Y') jeroen <jeroen@hierynomus.com> - ${new}-0
+entry="* $(LC_ALL=C date '+%a %b %d %Y') ${PACKAGER:-kanonmaten <86723077+kanonmaten@users.noreply.github.com>} - ${new}-0
 - Update to upstream ${new}"
 awk -v e="$entry" '
   { print }

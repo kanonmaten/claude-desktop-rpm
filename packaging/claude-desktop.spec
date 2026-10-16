@@ -2,7 +2,10 @@
 # spec file for package claude-desktop
 #
 # Copyright (c) 2026 Jeroen van Erp
+# Copyright (c) 2026 kanonmaten
 # Packaging under the MIT License (see LICENSE at the repo root).
+#
+# Tumbleweed fork of https://github.com/hierynomus/claude-desktop-rpm
 #
 # All license terms are preserved from the original .deb payload.
 # claude-desktop is Anthropic's proprietary desktop app (-> LicenseRef-
@@ -14,11 +17,14 @@
 # (dists/stable/main/binary-amd64/Packages, field "SHA256:"). Bumped in
 # lockstep with Version by scripts/bump-version.sh. Verified in %%prep so a
 # changed-out-from-under-us payload fails the build instead of shipping.
-%global deb_sha256 41745b0914f0ff51631a1ff1bb403b836bf5c995845cca6742dd39bca3a2da14
+%global deb_sha256 74cd2ccc29d24165144e455cbc872c6cc2a24a263b83e73420e95f89166d4aa4
+
+# Prebuilt Electron payload: nothing to debug, nothing to compile.
+%global debug_package %{nil}
 
 Name:           claude-desktop
-Version:        2.37337.1
-# OBS supplies the real release (lp160.N.M); 0 is the openSUSE convention.
+Version:        2.42304.0
+# OBS supplies the real release; 0 is the openSUSE convention.
 Release:        0
 Summary:        Desktop application for Claude (Chat, Cowork, Code)
 License:        LicenseRef-SUSE-NonFree AND BSD-3-Clause AND Apache-2.0
@@ -30,56 +36,68 @@ Source0:        claude-desktop_%{version}_amd64.deb
 ExclusiveArch:  x86_64
 # Electron's chrome-sandbox is shipped NON-SUID (0755). Chromium prefers the
 # unprivileged-user-namespace sandbox and only falls back to the SUID helper
-# when userns is unavailable; openSUSE enables unprivileged userns by default
-# (podman-rootless, flatpak). The sandbox stays fully active - this is not
-# --no-sandbox. Dropping the SUID bit also drops the SUSE permissions-
-# framework drop-in and rpmlint's SUID review flag. See README "Sandbox".
-BuildRequires:  fdupes
+# when userns is unavailable; openSUSE Tumbleweed enables unprivileged userns
+# by default (podman-rootless, flatpak). The sandbox stays fully active - this
+# is not --no-sandbox. See README "Sandbox".
 BuildRequires:  desktop-file-utils
+BuildRequires:  fdupes
+BuildRequires:  file
 
-# Mapping of the .deb's Depends onto openSUSE Leap 16 packages:
-#   libgtk-3-0        -> libgtk-3-0
-#   libnotify4        -> libnotify4
-#   libnss3           -> mozilla-nss
-#   xdg-utils         -> xdg-utils
-#   libatspi2.0-0     -> at-spi2-core
-#   libdrm2           -> libdrm2
-#   libgbm1           -> libgbm1
-#   libxcb-dri3-0     -> libxcb-dri3-0
-#   libsecret-1-0     -> libsecret-1-0
-#   libc6 (>= 2.34)   -> glibc (always present)
-#   libxtst6          -> libXtst6
-#   libuuid1          -> libuuid1
-#   xdg-desktop-portal-> xdg-desktop-portal
-#   trash alt group   -> gvfs (gvfs-trash) or kde-cli-tools6 (KIO trash);
-#                        keep gvfs as the portable one
-Requires:       glibc
-Requires:       libgtk-3-0
-Requires:       libnotify4
-Requires:       mozilla-nss
-Requires:       xdg-utils
-Requires:       at-spi2-core
+# Mapping of the .deb's Depends onto openSUSE Tumbleweed packages
+# (checked against the Tumbleweed OSS repo, Oct 2026):
+#   libgtk-3-0            -> libgtk-3-0
+#   libnotify4            -> libnotify4
+#   libnss3               -> mozilla-nss
+#   xdg-utils             -> xdg-utils
+#   libatspi2.0-0         -> libatspi0
+#   libdrm2               -> libdrm2
+#   libgbm1               -> libgbm1
+#   libxcb-dri3-0         -> libxcb-dri3-0
+#   libsecret-1-0         -> libsecret-1-0
+#   libc6 (>= 2.34)       -> glibc
+#   libxtst6              -> libXtst6
+#   libuuid1              -> libuuid1
+#   libpipewire-0.3-0     -> libpipewire-0_3-0  (screen share on Wayland)
+#   xdg-desktop-portal    -> xdg-desktop-portal
+#   portal backend alt    -> xdg-desktop-portal-{kde6,gtk,gnome}
+#   trash helper alt      -> kde-cli-tools6 | gvfs | trash-cli | glib2-tools
+# Rich (boolean) deps keep KDE systems from being forced to pull GNOME bits.
+Requires:       glibc >= 2.34
+Requires:       libatspi0
 Requires:       libdrm2
 Requires:       libgbm1
-Requires:       libxcb-dri3-0
+Requires:       libgtk-3-0
+Requires:       libnotify4
+Requires:       libpipewire-0_3-0
 Requires:       libsecret-1-0
-Requires:       libXtst6
 Requires:       libuuid1
+Requires:       libXtst6
+Requires:       libxcb-dri3-0
+Requires:       mozilla-nss
 Requires:       xdg-desktop-portal
-Requires:       gvfs
+Requires:       xdg-utils
+Requires:       (xdg-desktop-portal-kde6 or xdg-desktop-portal-gtk or xdg-desktop-portal-gnome)
+Requires:       (kde-cli-tools6 or gvfs or trash-cli or glib2-tools)
 
-# Deb Recommends (audio + app indicator + certs + Cowork VM stack)
-Recommends:     libpulse0
-Recommends:     libappindicator3-1
+# Deb Recommends: audio, tray icon, certs, keyring, Claude Code helpers
+# (bubblewrap sandbox, socat, ssh) and the Cowork VM stack.
+Recommends:     (libasound2 or libpulse0)
+Recommends:     (libayatana-appindicator3-1 or libappindicator3-1)
+Recommends:     (kwalletd6 or gnome-keyring)
 Recommends:     ca-certificates
-Suggests:       qemu
-Suggests:       ovmf
-Suggests:       virtiofsd
+Recommends:     bubblewrap
+Recommends:     openssh-clients
+Recommends:     socat
+Recommends:     qemu-ovmf-x86_64
+Recommends:     qemu-x86
+Recommends:     virtiofsd
+Suggests:       lsb-release
 
 %description
 Claude desktop application for Linux (beta). Provides Chat, Cowork and
-Claude Code in a native app. Upstream only ships an amd64/.deb build;
-this package repackages the official .deb payload for RPM systems.
+Claude Code in a native app. Upstream only ships .deb builds; this
+package repackages the official amd64 .deb payload as an RPM.
+
 Cowork additionally needs a KVM-capable machine, QEMU, OVMF and
 virtiofsd, plus the user in the KVM group.
 
@@ -90,54 +108,96 @@ echo '%{deb_sha256}  %{SOURCE0}' | sha256sum -c -
 # The .deb is an ar archive: debian-binary, control.tar.xz, data.tar.xz
 ar x %{SOURCE0}
 mkdir -p payload
-tar -xJf data.tar.xz -C payload
+tar -xf data.tar.* -C payload
 
 %build
 # Nothing to compile: self-contained Electron payload.
-# Strip the two shipped objects that still carry debug info.
-strip --strip-unneeded payload/usr/lib/claude-desktop/libvulkan.so.1
-strip --strip-unneeded payload/usr/lib/claude-desktop/resources/app.asar.unpacked/node_modules/node-pty/prebuilds/linux-x64/pty.node
+# Strip whatever upstream shipped with debug info still in it (the set
+# changes between releases, so detect instead of hard-coding paths).
+find payload/usr/lib/claude-desktop -type f -print0 \
+  | xargs -0 file -N -F '|' \
+  | awk -F'|' '/ELF/ && /with debug_info/ {sub(/^ +/, "", $1); print $1}' \
+  | while read -r f; do strip --strip-unneeded "$f"; done
 
 %install
-install -dm 0755 %{buildroot}/usr/lib
-cp -a payload/usr/lib/claude-desktop %{buildroot}/usr/lib/
-install -dm 0755 %{buildroot}/usr/bin
-ln -sf ../lib/claude-desktop/claude-desktop %{buildroot}/usr/bin/claude-desktop
-install -dm 0755 %{buildroot}/usr/share/applications
-cp -a payload/usr/share/applications/com.anthropic.Claude.desktop \
-    %{buildroot}/usr/share/applications/
+APP=%{buildroot}%{_prefix}/lib/claude-desktop
+install -dm 0755 %{buildroot}%{_prefix}/lib
+cp -a payload/usr/lib/claude-desktop %{buildroot}%{_prefix}/lib/
+install -dm 0755 %{buildroot}%{_bindir}
+ln -sf ../lib/claude-desktop/claude-desktop %{buildroot}%{_bindir}/claude-desktop
+
+install -Dm 0644 payload/usr/share/applications/com.anthropic.Claude.desktop \
+    %{buildroot}%{_datadir}/applications/com.anthropic.Claude.desktop
 # Upstream ships Categories=Utility;Development; - two "main" categories,
 # which desktop-file-validate/rpmlint reject (the entry would show up twice
 # in the menu). Collapse to a single main category.
 sed -i 's/^Categories=.*/Categories=Utility;/' \
-    %{buildroot}/usr/share/applications/com.anthropic.Claude.desktop
-desktop-file-validate %{buildroot}/usr/share/applications/com.anthropic.Claude.desktop
-install -dm 0755 %{buildroot}/usr/share/icons
-cp -a payload/usr/share/icons/hicolor %{buildroot}/usr/share/icons/
+    %{buildroot}%{_datadir}/applications/com.anthropic.Claude.desktop
+desktop-file-validate %{buildroot}%{_datadir}/applications/com.anthropic.Claude.desktop
+install -dm 0755 %{buildroot}%{_datadir}/icons
+cp -a payload/usr/share/icons/hicolor %{buildroot}%{_datadir}/icons/
+
+# What the .deb's postinst writes at install time, done statically here so
+# rpm owns the files (and removes them on uninstall):
+#  - MIME types for .mcpb / .dxt / .skill
+install -Dm 0644 "$APP/resources/linux-mime/com.anthropic.Claude.xml" \
+    %{buildroot}%{_datadir}/mime/packages/com.anthropic.Claude.xml
+#  - GNOME Shell search provider (inert outside GNOME)
+install -Dm 0644 "$APP/resources/gnome-search-provider/com.anthropic.Claude.search-provider.ini" \
+    %{buildroot}%{_datadir}/gnome-shell/search-providers/com.anthropic.Claude.search-provider.ini
+install -Dm 0644 "$APP/resources/gnome-search-provider/com.anthropic.Claude.SearchProvider.service" \
+    %{buildroot}%{_datadir}/dbus-1/services/com.anthropic.Claude.SearchProvider.service
+#  - `ccd` terminal launcher, only when this build ships one. The list
+#    always holds the main launcher too: rpm rejects an empty -f file.
+echo '%{_bindir}/claude-desktop' > extra.files
+if [ -x "$APP/resources/bin/ccd" ]; then
+  ln -s ../lib/claude-desktop/resources/bin/ccd %{buildroot}%{_bindir}/ccd
+  echo '%{_bindir}/ccd' >> extra.files
+fi
+# Skipped on purpose: the AppArmor profile (Ubuntu userns restriction, not
+# needed here) and the apt repo/keyring registration (OBS repo replaces it).
 
 # The Electron payload ships many byte-identical files (icon light/dark
 # pairs, content-hashed JS chunks); hardlink them. Must be the %%fdupes
 # macro, not bare `fdupes`: the macro recurses, plain fdupes does not.
-%fdupes %{buildroot}
+%fdupes %{buildroot}%{_prefix}
 
-# Ship chrome-sandbox NON-SUID (upstream .deb has it 4755). Chromium uses the
-# user-namespace sandbox when unprivileged userns is available (openSUSE
-# default) and never touches this helper; the SUID path is a fallback only.
-# No SUID bit -> no permissions-framework drop-in, no rpmlint SUID review.
-chmod 0755 %{buildroot}/usr/lib/claude-desktop/chrome-sandbox
+# Ship chrome-sandbox NON-SUID (upstream .deb has it 4755). See above.
+chmod 0755 "$APP/chrome-sandbox"
 
-# No %%post/%%postun: openSUSE runs update-desktop-database and
-# gtk-update-icon-cache from file triggers (desktop-file-utils, gtk3) on
-# /usr/share/applications and /usr/share/icons.
+# No desktop/icon cache scriptlets: Tumbleweed runs update-desktop-database,
+# gtk-update-icon-cache and update-mime-database from file triggers.
 
-%files
-%defattr(-,root,root)
-/usr/bin/claude-desktop
-/usr/lib/claude-desktop
-/usr/share/applications/com.anthropic.Claude.desktop
-/usr/share/icons/hicolor
+%files -f extra.files
+%license payload/usr/share/doc/claude-desktop/copyright
+%{_prefix}/lib/claude-desktop
+%{_datadir}/applications/com.anthropic.Claude.desktop
+%{_datadir}/icons/hicolor
+# Shared directories: co-owned so nothing is left unowned when the packages
+# that normally own them (shared-mime-info, gnome-shell, dbus) are absent.
+%dir %{_datadir}/mime
+%dir %{_datadir}/mime/packages
+%{_datadir}/mime/packages/com.anthropic.Claude.xml
+%dir %{_datadir}/gnome-shell
+%dir %{_datadir}/gnome-shell/search-providers
+%{_datadir}/gnome-shell/search-providers/com.anthropic.Claude.search-provider.ini
+%dir %{_datadir}/dbus-1
+%dir %{_datadir}/dbus-1/services
+%{_datadir}/dbus-1/services/com.anthropic.Claude.SearchProvider.service
 
 %changelog
+* Fri Oct 16 2026 kanonmaten <86723077+kanonmaten@users.noreply.github.com> - 2.42304.0-0
+- Update to upstream 2.42304.0
+- Retarget to openSUSE Tumbleweed
+- Add deps new in the upstream .deb: libpipewire-0_3-0, portal backend;
+  libatspi0 instead of at-spi2-core
+- Rich deps for trash helper / portal / keyring so KDE doesn't pull GNOME
+- Recommend bubblewrap, socat, openssh-clients and the Cowork VM stack
+  (qemu-x86, qemu-ovmf-x86_64, virtiofsd) like the upstream .deb does
+- Install MIME types, GNOME search provider and optional ccd launcher
+  statically instead of via postinst
+- Detect unstripped objects instead of hard-coding paths
+
 * Wed Oct 14 2026 jeroen <jeroen@hierynomus.com> - 2.37337.1-0
 - Update to upstream 2.37337.1
 

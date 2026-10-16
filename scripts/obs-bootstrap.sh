@@ -2,9 +2,10 @@
 # One-time OBS side of the SCM/CI setup. Idempotent; safe to re-run.
 #
 # Does the parts that can be scripted:
-#   - ensures home:hierynomus:ci exists (PR branch target) with the same
-#     Leap 16.0 / x86_64 repo as home:hierynomus
-#   - points home:hierynomus/claude-desktop at this git repo via <scmsync>
+#   - checks home:kanonmaten has an openSUSE_Tumbleweed / x86_64 repo
+#   - ensures home:kanonmaten:ci exists (PR branch target) with the same
+#     Tumbleweed / x86_64 repo
+#   - points home:kanonmaten/claude-desktop at this git repo via <scmsync>
 #   - creates the runservice token (push -> rebuild)
 #
 # The workflow token and the two GitHub webhooks are manual - they need a
@@ -14,12 +15,23 @@
 # Usage:   scripts/obs-bootstrap.sh [git-url]
 set -euo pipefail
 
-PROJ="home:hierynomus"
-CI_PROJ="home:hierynomus:ci"
+OBS_USER="kanonmaten"
+PROJ="home:$OBS_USER"
+CI_PROJ="home:$OBS_USER:ci"
+REPO="openSUSE_Tumbleweed"
 PKG="claude-desktop"
-GIT_URL="${1:-https://github.com/hierynomus/claude-desktop-rpm?subdir=packaging#main}"
+GIT_URL="${1:-https://github.com/kanonmaten/claude-desktop-rpm?subdir=packaging#main}"
 
 command -v osc >/dev/null || { echo "osc not installed / not in PATH"; exit 1; }
+
+echo "==> Checking $PROJ has a $REPO repository"
+if osc meta prj "$PROJ" | grep -q "<repository name=\"$REPO\""; then
+  echo "    ok"
+else
+  echo "    missing. Add it in the web UI: $PROJ -> Repositories -> Add from a"
+  echo "    Distribution -> openSUSE Tumbleweed (x86_64), then re-run this script."
+  exit 1
+fi
 
 echo "==> Ensuring $CI_PROJ exists (PR build target)"
 if osc meta prj "$CI_PROJ" >/dev/null 2>&1; then
@@ -29,9 +41,9 @@ else
 <project name="$CI_PROJ">
   <title>claude-desktop PR builds</title>
   <description>Throwaway branch target for pull-request builds of $PROJ/$PKG (OBS SCM/CI workflow integration).</description>
-  <person userid="hierynomus" role="maintainer"/>
-  <repository name="openSUSE_Leap_16.0">
-    <path project="openSUSE:Leap:16.0" repository="standard"/>
+  <person userid="$OBS_USER" role="maintainer"/>
+  <repository name="$REPO">
+    <path project="openSUSE:Factory" repository="snapshot"/>
     <arch>x86_64</arch>
   </repository>
 </project>
@@ -63,7 +75,7 @@ cat <<'NEXT'
 
 ==> Scripted part done. Remaining manual steps (docs/obs-setup.md):
 
-  1. GitHub: create a fine-grained PAT for hierynomus/claude-desktop-rpm
+  1. GitHub: create a fine-grained PAT for kanonmaten/claude-desktop-rpm
      with  Contents: read-only,  Commit statuses: read/write.
 
   2. OBS workflow token for PR builds (feed it that PAT):
@@ -90,8 +102,8 @@ cat <<'NEXT'
      enable "Allow GitHub Actions to create and approve pull requests".
 
   5. Verify (after a commit that touches packaging/):
-       osc results home:hierynomus claude-desktop
-       osc api /source/home:hierynomus/claude-desktop/_scmsync.obsinfo
+       osc results home:kanonmaten claude-desktop
+       osc api /source/home:kanonmaten/claude-desktop/_scmsync.obsinfo
      Force a sync by hand any time with:
-       osc service remoterun home:hierynomus claude-desktop
+       osc service remoterun home:kanonmaten claude-desktop
 NEXT
