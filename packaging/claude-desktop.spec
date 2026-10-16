@@ -112,11 +112,11 @@ tar -xf data.tar.* -C payload
 
 %build
 # Nothing to compile: self-contained Electron payload.
-# Strip whatever upstream shipped with debug info still in it (the set
+# Strip whatever upstream shipped unstripped (the set
 # changes between releases, so detect instead of hard-coding paths).
 find payload/usr/lib/claude-desktop -type f -print0 \
   | xargs -0 file -N -F '|' \
-  | awk -F'|' '/ELF/ && /with debug_info/ {sub(/^ +/, "", $1); print $1}' \
+  | awk -F'|' '/ELF/ && /not stripped/ {print $1}' \
   | while read -r f; do strip --strip-unneeded "$f"; done
 
 %install
@@ -160,7 +160,9 @@ fi
 # The Electron payload ships many byte-identical files (icon light/dark
 # pairs, content-hashed JS chunks); hardlink them. Must be the %%fdupes
 # macro, not bare `fdupes`: the macro recurses, plain fdupes does not.
-%fdupes %{buildroot}%{_prefix}
+# Scoped to the app dir: the copies in /usr/share must not become hardlinks
+# into /usr/lib (rpmlint hardlink-across-partition, badness 10000 each).
+%fdupes %{buildroot}%{_prefix}/lib/claude-desktop
 
 # Ship chrome-sandbox NON-SUID (upstream .deb has it 4755). See above.
 chmod 0755 "$APP/chrome-sandbox"
