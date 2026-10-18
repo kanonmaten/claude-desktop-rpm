@@ -31,7 +31,7 @@ jobs:
   bump:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Run bump script
         id: bump
@@ -50,7 +50,7 @@ jobs:
       - name: Open pull request
         id: cpr
         if: steps.bump.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: bump/claude-desktop-${{ steps.bump.outputs.version }}
           commit-message: "claude-desktop ${{ steps.bump.outputs.version }}: update to upstream release"
