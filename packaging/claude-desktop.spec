@@ -17,13 +17,13 @@
 # (dists/stable/main/binary-amd64/Packages, field "SHA256:"). Bumped in
 # lockstep with Version by scripts/bump-version.sh. Verified in %%prep so a
 # changed-out-from-under-us payload fails the build instead of shipping.
-%global deb_sha256 f1def40f41ffa0944c622a1e5ab90d1f00cb05fbeb85cd712f7f7b2c0989ee30
+%global deb_sha256 eb4d16c9aff0a696366d88728f74fa55136be7cfde3c1fe35af4062b45955b6f
 
 # Prebuilt Electron payload: nothing to debug, nothing to compile.
 %global debug_package %{nil}
 
 Name:           claude-desktop
-Version:        5.1231.0
+Version:        5.1231.2
 # OBS supplies the real release; 0 is the openSUSE convention.
 Release:        0
 Summary:        Desktop application for Claude (Chat, Cowork, Code)
@@ -200,6 +200,9 @@ chmod 0755 "$APP/chrome-sandbox"
 %{_datadir}/dbus-1/services/com.anthropic.Claude.SearchProvider.service
 
 %changelog
+* Wed Nov 11 2026 kanonmaten <86723077+kanonmaten@users.noreply.github.com> - 5.1231.2-0
+- Update to upstream 5.1231.2
+
 * Tue Nov 10 2026 kanonmaten <86723077+kanonmaten@users.noreply.github.com> - 5.1231.0-0
 - Update to upstream 5.1231.0
 
